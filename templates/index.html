@@ -1,0 +1,38 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Score{% endblock %}</title>
+  <link rel="stylesheet" type="text/css" href="http://apps.bdimg.com/libs/bootstrap/3.3.4/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+</head>
+<body>
+  <div class="container">
+    <div class="main-wrapper">
+      <div class="main-left-col">
+        <ul class="left-nav" id="nav">
+          <li v-for="item in navitems" role="presentation" v-bind:class="{'active': item.active}">
+            <a v-show="!item.editing" href="javascript:;" @click="onNav(item)" v-contextmenu="onMenu" v-text="item.title"></a>
+            <div class="edit" v-show="item.editing"><input type="text" v-model="item.edit"></div>
+          </li>
+        </ul>
+      </div>
+      <div class="main-right-col">
+        <div id="pspage">
+          <div v-if="show">
+            <div>Hello</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+  <script type="text/javascript" src="http://apps.bdimg.com/libs/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="http://apps.bdimg.com/libs/vue/1.0.8/vue.min.js"></script>
+  <script type="text/javascript" src="{% static 'script.js' %}"></script>
+</body>
+</html>

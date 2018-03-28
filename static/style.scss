@@ -1,0 +1,65 @@
+$color_theme: #009900;
+$color_text: #333;
+$color_bg_gray: #dddddd;
+$color_bg: #cccccc;
+
+html, body, .container, .main-wrapper, .main-left-col, .main-right-col {
+  height: 100%;
+  background-color: $color_bg;
+}
+.container {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+.main-wrapper {
+  position: relative;
+}
+.main-left-col {
+  padding-bottom: 20px;
+  overflow-y: scroll;
+  &::-webkit-scrollbar {
+    display:none;
+  }
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200px;
+}
+.main-right-col {
+  border: 1px $color_theme solid;
+  overflow-y: scroll;
+  margin-left: 200px;
+  padding: 20px;
+  background-color: white;
+}
+
+.left-nav {
+  padding: 0;
+  li {
+    list-style-type: none;
+    a,
+    a:hover,
+    a:link,
+    a:active,
+    a:visited {
+      text-decoration: none;
+      color: $color_text;
+      display: block;
+      padding: 5px 10px;
+    }
+    &:hover {
+      background-color: $color_bg_gray;
+    }
+    &.active {
+      background-color: white;
+      margin-right: -1px;
+      border: 1px $color_theme solid;
+      border-left-width: 2px;
+      border-right-color: $color_bg;
+      z-index: 10;
+    }
+    .editing {
+
+    }
+  }
+}

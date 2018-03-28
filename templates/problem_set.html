@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+
+{% block mainbody %}
+<div id="pspage" data-id="{{id}}">
+  <div class="row top-row">
+    <div class="col-md-12" v-if="!is_editing_name">
+      <span class="ps-name" class="" v-text="ps.name" @click="edit_ps_name"></span>
+    </div>
+    <div class="col-md-12" v-if="is_editing_name">
+      <form class="form-inline">
+        <div class="form-group">
+          <input type="text" class="form-control" v-model="ps_edit.name">
+        </div>
+        <button type="submit" class="btn btn-default" @click="submit_ps_name">OK</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block links %}
+<link rel="stylesheet" type="text/css" href="/static/css/problem_set.css">
+{% endblock %}
+
+{% block script %}
+<script type="text/javascript" src="/static/js/problem_set.js"></script>
+{% endblock %}

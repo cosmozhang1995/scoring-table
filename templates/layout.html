@@ -1,0 +1,37 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Score{% endblock %}</title>
+  <link rel="stylesheet" type="text/css" href="http://apps.bdimg.com/libs/bootstrap/3.3.4/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+  {% block links %}
+  {% endblock %}
+</head>
+<body>
+  <div class="container">
+    <div class="row main-row">
+      <div class="col-md-3 main-left-col">
+        <ul class="nav nav-pills nav-stacked" id="nav">
+          <li role="presentation"><a href="/">首页</a></li>
+          <li v-for="ps in problemsets" role="presentation"><a href="/ps/[[ps.id]]" v-text="ps.name"></a></li>
+        </ul>
+      </div>
+      <div class="col-md-9 main-right-col">
+        {% block mainbody %}
+        {% endblock %}
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+  <script type="text/javascript" src="http://apps.bdimg.com/libs/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+  <script type="text/javascript" src="http://apps.bdimg.com/libs/vue/1.0.8/vue.min.js"></script>
+  <script type="text/javascript" src="{% static 'script.js' %}"></script>
+  {% block script %}
+  {% endblock %}
+</body>
+</html>
