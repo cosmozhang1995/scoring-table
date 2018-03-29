@@ -13,11 +13,11 @@
 <body>
   <div class="container">
     <div class="main-wrapper">
-      <div class="main-left-col">
-        <ul class="left-nav" id="nav">
+      <div class="main-left-col" id="nav">
+        <ul class="left-nav">
           <li v-for="item in navitems" role="presentation" v-bind:class="{'active': item.active}">
-            <a v-show="!item.editing" href="javascript:;" @click="onNav(item)" v-contextmenu="onMenu" v-text="item.title"></a>
-            <div class="edit" v-show="item.editing"><input type="text" v-model="item.edit"></div>
+            <a v-show="!item.editing" href="javascript:;" @click="navto(item)" v-on:contextmenu="support.ctxmenu(item.menu, $event)" v-text="item.title"></a>
+            <div class="edit" v-show="item.editing"><input type="text" v-on:keypress="onEditKeypress(item, $event)" v-model="item.edit"></div>
           </li>
         </ul>
       </div>
@@ -29,10 +29,15 @@
         </div>
       </div>
     </div>
+    <div id="support">
+      <div class="ctxmenu" v-show="show_ctxmenu">
+        <div v-for="mitem in ctxmenuitems" class="ctxmenu-item" @click="onCtxMenuClick(mitem)" v-text="mitem.title"></div>
+      </div>
+    </div>
   </div>
   <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
   <script type="text/javascript" src="http://apps.bdimg.com/libs/bootstrap/3.3.4/js/bootstrap.min.js"></script>
-  <script type="text/javascript" src="http://apps.bdimg.com/libs/vue/1.0.8/vue.min.js"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vue@2.5.16/dist/vue.js"></script>
   <script type="text/javascript" src="{% static 'script.js' %}"></script>
 </body>
 </html>
