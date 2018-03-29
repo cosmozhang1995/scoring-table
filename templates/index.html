@@ -16,8 +16,7 @@
       <div class="main-left-col" id="nav">
         <ul class="left-nav">
           <li v-for="item in navitems" role="presentation" v-bind:class="{'active': item.active}">
-            <a v-show="!item.editing" href="javascript:;" @click="navto(item)" v-on:contextmenu="support.ctxmenu(item.menu, $event)" v-text="item.title"></a>
-            <div class="edit" v-show="item.editing"><input type="text" v-on:keypress="onEditKeypress(item, $event)" v-model="item.edit"></div>
+            <a href="javascript:;" @click="navto(item)" v-on:contextmenu="support.ctxmenu(item.menu, $event)" v-text="item.title"></a>
           </li>
         </ul>
       </div>

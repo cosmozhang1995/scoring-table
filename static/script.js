@@ -121,8 +121,7 @@ var nav = (function () {
               title: ps.name,
               active: false,
               ps_id: ps.id,
-              edit: undefined,
-              editing: false,
+              ps: ps,
               resolve: function () {
                 pspage.ps_id = item.ps_id;
                 pspage.fetch_problemset();
@@ -135,8 +134,14 @@ var nav = (function () {
                 {
                   title: "重命名",
                   action: function() {
-                    item.edit = item.title;
-                    item.editing = true;
+                    var val = prompt();
+                    r_put('/api/problemset/' + item.ps_id, {
+                      name: val
+                    })
+                    .done(function() {
+                      item.title = val;
+                      item.ps.name = val;
+                    });
                   }
                 },
                 {
@@ -179,21 +184,6 @@ var nav = (function () {
           item.resolve.call(this);
           this.current_nav = item;
           this.current_nav.active = true;
-        }
-      },
-      onEditKeypress: function (item, event) {
-        if (item.ps_id !== undefined) {
-          if (event.keyCode == 13) {
-            var val = item.edit;
-            r_put('/api/problemset/' + item.ps_id, {
-              name: item.edit
-            })
-            .done(function() {
-              item.title = val;
-              item.editing = false;
-            });
-            
-          }
         }
       }
     }
