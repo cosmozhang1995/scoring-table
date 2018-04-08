@@ -6,7 +6,7 @@ from django.shortcuts import render
 
 import json
 
-from models import ProblemSet, Student
+from models import ProblemSet, Student, Group, StudentGroup, ScoringRecord
 
 def JsonResponse(obj):
   return HttpResponse(json.dumps(obj), content_type="application/json")
@@ -77,19 +77,19 @@ def get_instant(model, _id=None):
 
 def restful_api(model):
   def api_fn(request, _id=None):
-    ins = get_instant(ProblemSet, _id)
+    ins = get_instant(model, _id)
     data = parse_request_data(request)
     if not _id is None and ins is None:
       return HttpResponseNotFound
     if request.method == methods.GET:
       if _id is None:
-        resp = [record.json() for record in ProblemSet.objects.all()]
+        resp = [record.json() for record in model.objects.all()]
         return JsonResponse(resp)
       else:
         resp = ins.json()
         return JsonResponse(resp)
     elif request.method == methods.POST:
-      ins = apply(ProblemSet.objects.create, (), data)
+      ins = apply(model.objects.create, (), data)
       resp = ins.json()
       return JsonResponse(resp)
     if request.method == methods.PUT and not ins is None and not data is None:
@@ -106,3 +106,80 @@ def restful_api(model):
 
 api_problem_set = restful_api(ProblemSet)
 api_student = restful_api(Student)
+
+def api_get_scorings(request, ps_id):
+  ps_id = int(ps_id)
+  ps = ProblemSet.objects.get(id=ps_id)
+  students = list(Student.objects.all())
+  groups = list(Group.objects.filter(ps=ps))
+  scores = []
+  for grp in groups:
+    sts = map(lambda stgrp: stgrp.student, StudentGroup.objects.filter(group=grp))
+    for st in sts:
+      students = filter(lambda s: s.id != st.id, students)
+    scr = ScoringRecord.objects.find(group=grp)
+    scores.append({
+      "gid": grp.id,
+      "students": map(lambda st: st.json(), sts),
+      "scoring": scr.scores
+    })
+  for st in students:
+    scores.append({
+      "gid": None,
+      "students": map(lambda st: st.json(), sts),
+      "scoring": None
+    })
+  return JsonResponse(scores)
+
+def api_regroup(request, ps_id):
+  ps_id = int(ps_id)
+  ps = ProblemSet.objects.get(id=ps_id)
+  data = parse_request_data(request)
+  students = map(lambda sid: Student.objects.get(id=sid), data['sids'])
+  for student in students:
+    oldstgrp = filter(lambda stgrp: stgrp.group.ps.id == ps_id, StudentGroup.objects.filter(student=student))
+    oldstgrp = oldstgrp[0] if len(oldstgrp) > 0 else None
+    if not oldstgrp is None:
+      oldgrp = oldstgrp.group
+      if len(StudentGroup.objects.filter(group=oldgrp)) < 2:
+        oldgrp.delete()
+      oldstgrp.delete()
+  grp = Group.objects.create(ps=ps)
+  for student in students:
+    stgrp = StudentGroup.objects.create(group=grp, student=student)
+  return JsonResponse({
+    "gid": grp.id,
+    "students": map(lambda st: st.json(), students),
+    "scoring": None
+  })
+
+def api_update_group_scoring(request, grp_id):
+  grp_id = int(grp_id)
+  grp = Group.objects.get(id=grp_id)
+  scr = ScoringRecord.objects.get(group=grp)
+  if scr is None:
+    scr = ScoringRecord.objects.create(group=grp)
+  data = parse_request_data(request)
+  scr.scores = data['scoring']
+  scr.save()
+  return HttpResponse("ok")
+
+def api_update_student_scoring(request, st_id, ps_id):
+  st_id = int(st_id)
+  st = Student.objects.get(id=st_id)
+  ps_id = int(ps_id)
+  ps = ProblemSet.objects.get(id=ps_id)
+  data = parse_request_data(request)
+  stgrp = filter(lambda stgrp: stgrp.group.ps.id == ps_id, StudentGroup.objects.filter(student=st))
+  stgrp = stgrp[0] if len(stgrp) > 0 else None
+  if stgrp is None:
+    grp = Group.objects.create(ps=ps)
+    stgrp = StudentGroup.objects.create(group=grp, student=st)
+  else:
+    grp = stgrp.group
+  scr = ScoringRecord.objects.get(group=grp)
+  if scr is None:
+    scr = ScoringRecord.objects.create(group=grp)
+  data = parse_request_data(request)
+  scr.scores = data['scoring']
+  scr.save()

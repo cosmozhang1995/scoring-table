@@ -92,3 +92,19 @@ html, body, .container, .main-wrapper, .main-left-col, .main-right-col {
   }
   z-index: 500;
 }
+
+.common-table {
+  th, td {
+    height: 20px;
+    min-width: 100px;
+    line-height: 20px;
+    padding: 5px;
+    border: 1px $color_gray solid;
+    margin-right: -1px;
+    margin-bottom: -1px;
+    input {
+      border: none;
+      width: 90px;
+    }
+  }
+}
