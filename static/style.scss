@@ -4,6 +4,8 @@ $color_bg_gray: #dddddd;
 $color_bg: #cccccc;
 $color_gray: #999999;
 
+$tr_height: 20px;
+
 html, body, .container, .main-wrapper, .main-left-col, .main-right-col {
   height: 100%;
   background-color: $color_bg;
@@ -28,10 +30,22 @@ html, body, .container, .main-wrapper, .main-left-col, .main-right-col {
 }
 .main-right-col {
   border: 1px $color_theme solid;
-  overflow-y: scroll;
+  height: 100%;
+  overflow: hidden;
   margin-left: 200px;
-  padding: 20px;
   background-color: white;
+}
+
+.fullfill {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.scroll-x {
+  overflow-x: scroll;
+}
+.scroll-y {
+  overflow-y: scroll;
 }
 
 .left-nav {
@@ -93,18 +107,181 @@ html, body, .container, .main-wrapper, .main-left-col, .main-right-col {
   z-index: 500;
 }
 
+.table-wrapper {
+  @extend .fullfill;
+  overflow: scroll;
+  padding: 20px;
+  &.no-pad {
+    padding: 0;
+  }
+}
+
 .common-table {
   th, td {
-    height: 20px;
-    min-width: 100px;
-    line-height: 20px;
+    height: $tr_height + 11px;
+    line-height: $tr_height;
     padding: 5px;
     border: 1px $color_gray solid;
     margin-right: -1px;
     margin-bottom: -1px;
+    white-space: nowrap;
+    &.align-center {
+      text-align: center;
+    }
+    &.align-left {
+      text-align: left;
+    }
+    &.align-right {
+      text-align: right;
+    }
     input {
       border: none;
       width: 90px;
+      margin: 0;
+    }
+    input[type="checkbox"] {
+      width: auto;
+    }
+    &:hover {
+      background-color: $color_bg_gray;
+    }
+  }
+  th {
+    min-width: 100px;
+    text-align: center;
+    cursor: default;
+    &.shrink {
+      min-width: 0;
+    }
+  }
+}
+
+.button {
+  display: inline-block;
+  line-height: 20px;
+  padding: 5px 10px;
+  background-color: $color_theme;
+  border: 1px darken($color_theme, 10%) solid;
+  color: white;
+  user-select: none;
+  margin-left: 10px;
+  &:first-child {
+    margin-left: 0;
+  }
+  &,
+  &:link,
+  &:visited,
+  &:hover,
+  &:active {
+    color: white;
+    background-color: $color_theme;
+    text-decoration: none;
+  }
+  &:hover {
+    background-color: lighten($color_theme, 5%);
+  }
+  &:active {
+    background-color: darken($color_theme, 5%);
+  }
+}
+
+#pspage {
+  $tdw1: 30px;
+  $tdw2: 50px;
+  $tdw3: 100px;
+  $tdw4: 100px;
+  $tdws: 50px;
+  $tdw_lead: $tdw1 + $tdw2 + $tdw3 + $tdw4;
+  .common-table {
+    td, th {
+      & {
+        min-width: 0;
+      }
+      &.c0 {
+        width: 0;
+        max-width: 0;
+        border: none;
+        padding: 0;
+      }
+      &.c1 {
+        width: $tdw1;
+        max-width: $tdw1;
+      }
+      &.c2 {
+        width: $tdw2;
+        max-width: $tdw2;
+      }
+      &.c3 {
+        width: $tdw3;
+        max-width: $tdw3;
+      }
+      &.c4 {
+        width: $tdw4;
+        max-width: $tdw4;
+      }
+      &.cs {
+        width: $tdws;
+        max-width: $tdws;
+      }
+    }
+  }
+  .page-container {
+    @extend .fullfill;
+    display: flex;
+    flex-direction: row;
+    .table-container {
+      height: 100%;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      .tool-buttons {
+        padding: 10px;
+      }
+      .head-row {
+        width: 100%;
+      }
+      .body-rows {
+        width: 100%;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: row;
+        margin-top: -1px;
+        .head-cols {
+          overflow: hidden;
+        }
+        .main-table {
+          flex-grow: 1;
+          overflow: hidden;
+          .common-table {
+            margin-left: -1px;
+          }
+        }
+      }
+    }
+    $scroller_thick: 7px;
+    .h-scroller, .v-scroller {
+      position: relative;
+      background-color: $color_gray;
+      flex-shrink: 0;
+      flex-grow: 0;
+      .scroller-block {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        background-color: $color_theme;
+        &:hover,
+        &.active {
+          background-color: darken($color_theme, 5%);
+        }
+      }
+    }
+    .h-scroller {
+      width: 100%;
+      height: $scroller_thick;
+    }
+    .v-scroller {
+      height: 100%;
+      width: $scroller_thick;
     }
   }
 }

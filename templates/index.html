@@ -21,56 +21,103 @@
         </ul>
       </div>
       <div class="main-right-col">
-        <div id="homepage">
-          <div v-if="show">
-            <table class="common-table">
-              <tr>
-                <th><input type="checkbox" v-model="all_checked" v-on:change="onAllChecked()"></th>
-                <th>学号</th>
-                <th>姓名</th>
-                <th>操作</th>
-              </tr>
-              <tr v-for="st in students">
-                <td><input type="checkbox" v-model="st.checked"></td>
-                <!-- 显示界面 -->
-                <td v-if="!st.editing" v-text="st.no"></td>
-                <td v-if="!st.editing" v-text="st.name"></td>
-                <td v-if="!st.editing">
-                  <a href="javascript:;" @click="editStudent(st)">编辑</a>
-                  <a href="javascript:;" @click="deleteStudent(st)">删除</a>
-                </td>
-                <!-- 编辑界面 -->
-                <td v-if="st.editing"><input v-model="st.edit.no"></td>
-                <td v-if="st.editing"><input v-model="st.edit.name"></td>
-                <td v-if="st.editing">
-                  <a href="javascript:;" @click="editStudentComplete(st)">完成</a>
-                  <a href="javascript:;" @click="editStudentCancel(st)">取消</a>
-                </td>
-              </tr>
-              <tr v-if="is_adding">
-                <td><input v-model="st_new.no"></td>
-                <td><input v-model="st_new.name"></td>
-                <td>
-                  <a href="javascript:;" @click="addStudentComplete()">完成</a>
-                  <a href="javascript:;" @click="addStudentCancel()">取消</a>
-                </td>
-              </tr>
-              <tr v-if="!is_adding">
-                <td></td>
-                <td></td>
-                <td></td>
-                <td>
-                  <a href="javascript:;" @click="addStudent()">添加</a>
-                  <a href="javascript:;" @click="addStudentBatch()">批量添加</a>
-                  <a href="javascript:;" @click="deleteStudentBatch()">批量删除</a>
-                </td>
-              </tr>
-            </table>
+        <div id="homepage" class="fullfill" v-show="is_shown">
+          <div class="fullfill" v-if="is_shown">
+            <div class="table-wrapper">
+              <table class="common-table">
+                <tr>
+                  <th class="shrink"><input type="checkbox" v-model="all_checked" v-on:change="onAllChecked()"></th>
+                  <th>学号</th>
+                  <th>姓名</th>
+                  <th>操作</th>
+                </tr>
+                <tr v-for="st in students">
+                  <td><input type="checkbox" v-model="st.checked"></td>
+                  <!-- 显示界面 -->
+                  <td v-if="!st.editing" v-text="st.no"></td>
+                  <td v-if="!st.editing" v-text="st.name"></td>
+                  <td v-if="!st.editing">
+                    <a href="javascript:;" @click="editStudent(st)">编辑</a>
+                    <a href="javascript:;" @click="deleteStudent(st)">删除</a>
+                  </td>
+                  <!-- 编辑界面 -->
+                  <td v-if="st.editing"><input v-model="st.edit.no"></td>
+                  <td v-if="st.editing"><input v-model="st.edit.name"></td>
+                  <td v-if="st.editing">
+                    <a href="javascript:;" @click="editStudentComplete(st)">完成</a>
+                    <a href="javascript:;" @click="editStudentCancel(st)">取消</a>
+                  </td>
+                </tr>
+                <tr v-if="is_adding">
+                  <td><input v-model="st_new.no"></td>
+                  <td><input v-model="st_new.name"></td>
+                  <td>
+                    <a href="javascript:;" @click="addStudentComplete()">完成</a>
+                    <a href="javascript:;" @click="addStudentCancel()">取消</a>
+                  </td>
+                </tr>
+                <tr v-if="!is_adding">
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td>
+                    <a href="javascript:;" @click="addStudent()">添加</a>
+                    <a href="javascript:;" @click="addStudentBatch()">批量添加</a>
+                    <a href="javascript:;" @click="deleteStudentBatch()">批量删除</a>
+                  </td>
+                </tr>
+              </table>
+            </div>
           </div>
         </div>
-        <div id="pspage">
-          <div v-if="show">
-            <div>Hello</div>
+        <div id="pspage" v-show="is_shown" class="fullfill">
+          <div v-if="is_shown" class="fullfill page-container">
+            <div class="table-container">
+              <div class="tool-buttons">
+                <a href="javascript:;" class="button" @click="regroup()">设置分组</a>
+                <a href="javascript:;" class="button" @click="degroup()">解除分组</a>
+              </div>
+              <div class="head-row">
+                <table class="common-table">
+                  <tr>
+                    <th class="c1"><input type="checkbox" v-model="all_checked" v-on:change="onAllChecked()"></th>
+                    <th class="c2">分组</th>
+                    <th class="c3">学号</th>
+                    <th class="c4">姓名</th>
+                    <th class="cs" v-for="prb in problems" v-text="prb.name"></th>
+                  </tr>
+                </table>
+              </div>
+              <div class="body-rows">
+                <div class="head-cols">
+                  <table class="common-table">
+                    <tr v-for="rowdata in tabledata">
+                      <td class="c1 align-center"><input type="checkbox" v-model="rowdata.checked"></td>
+                      <td class="c2 align-center" v-if="rowdata.is_first" v-bind:rowspan="rowdata.numsts" v-text="rowdata.gsq"></td>
+                      <td class="c3" v-text="rowdata.student.no"></td>
+                      <td class="c4" v-text="rowdata.student.name"></td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="main-table">
+                  <table class="common-table">
+                    <tr v-for="rowdata in tabledata">
+                      <td class="c0"></td>
+                      <!-- 显示界面 -->
+                      <td class="cs" v-if="rowdata.is_first && !rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring" v-text="scr.str"></td>
+                      <!-- 编辑界面 -->
+                      <td class="cs" v-if="rowdata.is_first && rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring"><input v-model="scr.edit"></td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+              <div class="h-scroller" v-scroller="hscroller">
+                <div class="scroller-block"></div>
+              </div>
+            </div>
+            <div class="v-scroller" v-scroller="vscroller">
+              <div class="scroller-block"></div>
+            </div>
           </div>
         </div>
       </div>

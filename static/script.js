@@ -86,6 +86,13 @@ function parse_csv(textdata) {
   return data;
 }
 
+$(document).on("keydown", function(event) {
+  if (event.ctrlKey == true && event.keyCode == 83) {
+    event.preventDefault();
+    $(document).trigger('save');
+  }
+});
+
 var support = (function() {
   return new Vue({
     el: '#support',
@@ -151,9 +158,9 @@ var support = (function() {
 var nav = (function () {
   var navitem_home = { page: "home", title: "首页", active: false, resolve: function () {
     homepage.fetchStudents();
-    homepage.show = true;
+    homepage.show();
   }, exit: function () {
-    homepage.show = false;
+    homepage.hide();
   } };
   var navitem_add_ps = { page: "addps", title: "添加+", active: false, resolve: function () {
     var name = prompt();
@@ -194,11 +201,13 @@ var nav = (function () {
               ps: ps,
               resolve: function () {
                 pspage.ps_id = item.ps_id;
-                pspage.fetch_problemset();
-                pspage.show = true;
+                pspage.fetch_data()
+                .then(function() {
+                  pspage.show();
+                });
               },
               exit: function () {
-                pspage.show = false;
+                pspage.hide();
               },
               menu: [
                 {
@@ -238,7 +247,7 @@ var nav = (function () {
         var that = this;
         r_get('/api/problemsets')
         .done(function(data) {
-          that.$data.problemsets = data;
+          that.problemsets = data;
           that.build_navitems();
         });
       },
@@ -276,7 +285,7 @@ var homepage = (function () {
   return new Vue({
     el: "#homepage",
     data: {
-      show: false,
+      is_shown: false,
       students: [],
       st_new: {
         name: "",
@@ -286,6 +295,12 @@ var homepage = (function () {
       all_checked: false
     },
     methods: {
+      show: function () {
+        this.is_shown = true;
+      },
+      hide: function () {
+        this.is_shown = false;
+      },
       fetchStudents: function (st) {
         var that = this;
         that.students = [];
@@ -408,37 +423,329 @@ var homepage = (function () {
   });
 })();
 
-var pspage = new Vue({
-  el: "#pspage",
-  data: {
-    show: false,
-    ps_id: undefined,
-    ps: {},
-    ps_edit: {
-      name: "",
-      method: "",
-      problems: ""
-    },
-    is_editing_name: false
-  },
-  computed: {
-  },
-  methods: {
-    fetch_problemset: function () {
-      var that = this;
-      $.get('/api/problemset/' + this.$data.ps_id, function(data) {
-        that.$data.ps = data;
-      });
-    },
-    edit_ps_name: function() {
-      this.$data.ps_edit.name = this.$data.ps.name;
-      this.$data.is_editing_name = true;
-    },
-    submit_ps_name: function() {
-      this.$data.is_editing_name = false;
+var Scroller = function (direction) {
+  var total = 0;
+  var visible = 0;
+  var current = 0;
+  var view_current = 0;
+  var view_total = 0;
+  var handlers = {};
+  var that = this;
+  var mouse_down = false;
+  var mouse_down_pos = { x: 0, y: 0 };
+  var mouse_down_current = 0;
+  var mouse_over = false;
+  var wrapper_el = null;
+  var block_el = null;
+  var update_view = function () {
+    if (wrapper_el && block_el) {
+      if (direction == Scroller.H) {
+        view_total = wrapper_el.width();
+        view_current = current / total * view_total;
+        block_el.width(visible / total * view_total);
+        block_el.css("left", view_current + "px");
+      } else {
+        view_total = wrapper_el.height();
+        view_current = current / total * view_total;
+        block_el.height(visible / total * view_total);
+        block_el.css("top", view_current + "px");
+      }
     }
+  };
+  var scrollCurrent = function (pos) {
+    if (pos === undefined) {
+      return current;
+    } else {
+      if (pos > total - visible) pos = total - visible;
+      if (pos < 0) pos = 0;
+      current = pos;
+      update_view();
+      that.trigger('scroll');
+    }
+  };
+  $(document).on('mousedown', (event) => this.onMouseDown(event));
+  $(document).on('mouseup', (event) => this.onMouseUp(event));
+  $(document).on('mousemove', (event) => this.onMouseMove(event));
+  $(document).on("mousewheel", function (event) {
+    var deltaX = event.originalEvent.deltaX;
+    var deltaY = event.originalEvent.deltaY;
+    var delta = direction == Scroller.H ? deltaX : deltaY;
+    if (delta == 0) return;
+    scrollCurrent(current + delta / 5);
+});
+  this.onMouseDown = function (event) {
+    if (!block_el || event.target != block_el[0]) return;
+    mouse_down_pos.x = event.clientX;
+    mouse_down_pos.y = event.clientY;
+    mouse_down_current = current;
+    mouse_down = true;
+    if (block_el) $(block_el).addClass('active');
+  };
+  this.onMouseUp = function (event) {
+    // if (event.target != block_el[0]) return;
+    mouse_down = false;
+    if (block_el) $(block_el).removeClass('active');
+  };
+  this.onMouseMove = function (event) {
+    if (mouse_down) {
+      var dx = event.clientX - mouse_down_pos.x;
+      var dy = event.clientY - mouse_down_pos.y;
+      var ww = wrapper_el.width();
+      var wh = wrapper_el.height();
+      if (direction == Scroller.H) scrollCurrent(mouse_down_current + dx / ww * total);
+      else scrollCurrent(mouse_down_current + dy / wh * total);
+    }
+  };
+  this.init = function (el, total, visible) {
+    wrapper_el = $(el);
+    block_el = wrapper_el.find('.scroller-block');
+    block_el.css('user-select', "none");
+    update_view();
+  };
+  this.resize = function (new_total, new_visible) {
+    if (new_total !== total || new_visible !== visible) {
+      visible = new_visible;
+      total = new_total;
+      update_view();
+    }
+  };
+  this.scrollTop = function (pos) {
+    if (direction != Scroller.V) throw "Calling scrollTop of scroller which is not vertical";
+    return scrollCurrent(pos);
+  };
+  this.scrollLeft = function (pos) {
+    if (direction != Scroller.H) throw "Calling scrollLeft of scroller which is not horizontal";
+    return scrollCurrent(pos);
+  };
+  this.on = function (name, handler) {
+    if (!handlers[name]) handlers[name] = [];
+    handlers[name].push(handler);
+  };
+  this.off = function (name) {
+    if (handlers[name]) handlers[name] = [];
+  };
+  this.trigger = function (name) {
+    var that = this;
+    var the_handlers = handlers[name];
+    var event = {};
+    if (direction == Scroller.V) event.scrollTop = this.scrollTop();
+    if (direction == Scroller.H) event.scrollLeft = this.scrollLeft();
+    if (the_handlers && the_handlers.length > 0) {
+      setTimeout(function() {
+        for (var hdl of the_handlers) {
+          hdl.call(that, event);
+        }
+      }, 0);
+    }
+  };
+};
+Scroller.H = 1;
+Scroller.V = 2;
+
+Vue.directive("scroller", {
+  bind: function (el, binding, vnode) {
+    var scroller = binding.value;
+    scroller.init(el, 0, 0);
   }
 });
+
+Vue.directive("scroller-total", (function () {
+  var current_value;
+  return {
+    bind: function (el, binding, vnode) {
+      $(el).data('scroller').total = binding.value;
+    },
+    update: function (el, binding, vnode) {
+      $(el).data('scroller').total = binding.value;
+    }
+  };
+})());
+
+Vue.directive("scroller-visible", (function () {
+  var current_value;
+  return {
+    bind: function (el, binding, vnode) {
+      $(el).data('scroller').visible = binding.value;
+    },
+    update: function (el, binding, vnode) {
+      $(el).data('scroller').visible = binding.value;
+    }
+  };
+})());
+
+var pspage = (function () {
+  return new Vue({
+    el: "#pspage",
+    data: {
+      is_shown: false,
+      ps_id: undefined,
+      ps: {},
+      ps_edit: {
+        method: "",
+        problems: ""
+      },
+      scorings: [],
+      tabledata: [],
+      problems: [],
+      promlem_dirty: false,
+      all_checked: false,
+      hscroller: new Scroller(Scroller.H),
+      vscroller: new Scroller(Scroller.V)
+    },
+    computed: {
+    },
+    created: function () {
+      var that = this;
+      setInterval(function() {
+        var totalh = $(that.$el).find('.main-table .common-table').height() || 0;
+        var visibleh = $(that.$el).find('.main-table').height() || 0;
+        var totalw = $(that.$el).find('.main-table .common-table').width() || 0;
+        var visiblew = $(that.$el).find('.main-table').width() || 0;
+        that.vscroller.resize(totalh, visibleh);
+        that.hscroller.resize(totalw, visiblew);
+      }, 100);
+      that.vscroller.on('scroll', function (event) {
+        var st = event.scrollTop;
+        $(that.$el).find('.main-table .common-table').css("position", "relative").css("top", -st + "px");
+        $(that.$el).find('.head-cols .common-table').css("position", "relative").css("top", -st + "px");
+      });
+      that.hscroller.on('scroll', function (event) {
+        var sl = event.scrollLeft;
+        $(that.$el).find('.main-table .common-table').css("position", "relative").css("left", -sl + "px");
+      });
+    },
+    methods: {
+      show: function () {
+        this.is_shown = true;
+      },
+      hide: function () {
+        this.is_shown = false;
+      },
+      fetch_problemset: function () {
+        var that = this;
+        return new Promise(function (resolve, reject) {
+          r_get('/api/problemset/' + that.ps_id)
+          .done(function(data) {
+            that.ps = data;
+            resolve();
+          })
+          .fail(function(err) {
+            reject();
+          })
+        });
+      },
+      fetch_scoring: function() {
+        var that = this;
+        return new Promise(function (resolve, reject) {
+          r_get('/api/scorings/' + that.ps_id)
+          .done(function(data) {
+            that.scorings = data;
+            resolve();
+          })
+          .fail(function(err) {
+            reject();
+          })
+        });
+      },
+      fetch_data: function() {
+        var that = this;
+        return Promise.all([that.fetch_problemset(), that.fetch_scoring()])
+        .then(function() {
+          that.problems = (function() {
+            return that.ps.problems.split(",").map((word) => {
+              var name = word.trim();
+              return {
+                name: word.trim(),
+                edit: word.trim()
+              };
+            });
+          })();
+          that.promlem_dirty = false;
+          that.tabledata = (function () {
+            var data = [];
+            for (var scoring of that.scorings) {
+              var gid = scoring.gid;
+              var sts = scoring.students;
+              var scr = (scoring.scoring||"").split(",").map((word) => parseInt(word));
+              while (scr.length < that.problems.length) scr.push(NaN);
+              data.push({
+                is_first: true,
+                gsq: "-",
+                gid: gid,
+                student: sts[0],
+                numsts: sts.length,
+                scoring: scr.map((scrnum) => {
+                  var numstr = that.number2str(scrnum);
+                  return {
+                    num: scrnum,
+                    str: that.number2str(scrnum),
+                    edit: that.number2str(scrnum)
+                  };
+                }),
+                checked: false,
+                editing: false,
+                dirty: false
+              });
+              for (var st of sts.slice(1)) {
+                data.push({
+                  is_first: false,
+                  gid: gid,
+                  student: st,
+                  checked: false
+                });
+              }
+            }
+            return data;
+          })();
+          that.all_checked = false;
+          that.vscroller.scrollTop(0);
+          that.hscroller.scrollLeft(0);
+        });
+      },
+      onAllChecked: function () {
+        for (var rowdata of this.tabledata) {
+          rowdata.checked = this.all_checked;
+        }
+      },
+      number2str: function (num) {
+        if (typeof num === "number" && !isNaN(num)) return "" + num;
+        else return "";
+      },
+      regroup: function () {
+        var that = this;
+        var rows = this.tabledata.filter((row) => row.checked);
+        if (rows.length > 1) {
+          var sts = rows.map((row) => row.student);
+          if (!confirm("确定要将 " + sts.map((st) => st.name).join("、") + " 分为一组吗？")) return;
+          r_post("/api/regroup/" + that.ps_id, { "sids": sts.map((st) => st.id) })
+          .done(function() {
+            that.fetch_data();
+          });
+        }
+      },
+      degroup: function () {
+        var that = this;
+        var rows = this.tabledata.filter((row) => row.checked);
+        if (rows.length > 0) {
+          var gid = rows[0].gid;
+          var sts = rows.map((row) => row.student);
+          var stnamesstr = sts.map((st) => st.name).join("、");
+          for (row of rows) {
+            if (row.gid != gid) {
+              alert(stnamesstr + " 并不在同一分组中，请检查");
+              return;
+            }
+          }
+          if (!confirm("确定要解除 " + stnamesstr + " 的分组吗？")) return;
+          r_post("/api/degroup/" + gid)
+          .done(function() {
+            that.fetch_data();
+          });
+        }
+      }
+    }
+  });
+})();
 
 $(function() {
   nav.navto("home");

@@ -117,16 +117,20 @@ def api_get_scorings(request, ps_id):
     sts = map(lambda stgrp: stgrp.student, StudentGroup.objects.filter(group=grp))
     for st in sts:
       students = filter(lambda s: s.id != st.id, students)
-    scr = ScoringRecord.objects.find(group=grp)
+    scr = ScoringRecord.objects.filter(group=grp)
+    if len(scr) > 0:
+      scr = scr[0].scores
+    else:
+      scr = None
     scores.append({
       "gid": grp.id,
       "students": map(lambda st: st.json(), sts),
-      "scoring": scr.scores
+      "scoring": scr
     })
   for st in students:
     scores.append({
       "gid": None,
-      "students": map(lambda st: st.json(), sts),
+      "students": [st.json()],
       "scoring": None
     })
   return JsonResponse(scores)
@@ -141,17 +145,27 @@ def api_regroup(request, ps_id):
     oldstgrp = oldstgrp[0] if len(oldstgrp) > 0 else None
     if not oldstgrp is None:
       oldgrp = oldstgrp.group
-      if len(StudentGroup.objects.filter(group=oldgrp)) < 2:
+      if len(StudentGroup.objects.filter(group=oldgrp)) < 3:
         oldgrp.delete()
       oldstgrp.delete()
-  grp = Group.objects.create(ps=ps)
-  for student in students:
-    stgrp = StudentGroup.objects.create(group=grp, student=student)
+  if len(students) > 1:
+    grp = Group.objects.create(ps=ps)
+    for student in students:
+      stgrp = StudentGroup.objects.create(group=grp, student=student)
+    gid = grp.id
+  else:
+    gid = None
   return JsonResponse({
-    "gid": grp.id,
+    "gid": gid,
     "students": map(lambda st: st.json(), students),
     "scoring": None
   })
+
+def api_degroup(request, grp_id):
+  grp_id = int(grp_id)
+  grp = Group.objects.get(id=grp_id)
+  grp.delete()
+  return JsonResponse({})
 
 def api_update_group_scoring(request, grp_id):
   grp_id = int(grp_id)
