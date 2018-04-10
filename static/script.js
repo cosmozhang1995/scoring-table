@@ -199,6 +199,7 @@ var nav = (function () {
               active: false,
               ps_id: ps.id,
               ps: ps,
+              dirty: false,
               resolve: function () {
                 pspage.ps_id = item.ps_id;
                 pspage.fetch_data()
@@ -587,10 +588,11 @@ var pspage = (function () {
       scorings: [],
       tabledata: [],
       problems: [],
-      promlem_dirty: false,
+      ps_dirty: false,
       all_checked: false,
       hscroller: new Scroller(Scroller.H),
-      vscroller: new Scroller(Scroller.V)
+      vscroller: new Scroller(Scroller.V),
+      support: support
     },
     computed: {
     },
@@ -652,15 +654,87 @@ var pspage = (function () {
         return Promise.all([that.fetch_problemset(), that.fetch_scoring()])
         .then(function() {
           that.problems = (function() {
-            return that.ps.problems.split(",").map((word) => {
+            function indexOf(prbitem) {
+              var idx = undefined;
+              for (var i in that.problems) {
+                if (that.problems[i] === prbitem) {
+                  idx = i;
+                  break;
+                }
+              }
+              return idx;
+            }
+            function insertAt(idx) {
+              var name = prompt("插入新问题");
+              if (typeof name !== "string" || name.length == 0) return;
+              var prbitem = createProblemItem(name);
+              for (var row of tabledata) {
+                if (row.is_first && (typeof row.gid === "number")) {
+                  row.scoring = [].concat(row.scoring.slice(0, idx), [NaN], row.scoring.slice(idx));
+                  row.dirty = true;
+                }
+              }
+              that.problems = [].concat(that.problems.slice(0, idx), [prbitem], that.problems.slice(idx));
+              that.ps_dirty = true;
+              that.mark_dirty();
+            }
+            function createProblemItem (word) {
               var name = word.trim();
-              return {
+              var prbitem = {
                 name: word.trim(),
-                edit: word.trim()
+                menu: [
+                  {
+                    title: "重命名",
+                    action: function () {
+                      var oldname = prbitem.name;
+                      var newname = prompt("重命名", oldname);
+                      if (oldname != newname) {
+                        prbitem.name = newname;
+                        that.ps_dirty = true;
+                        that.mark_dirty();
+                      }
+                    }
+                  },
+                  {
+                    title: "删除",
+                    action: function () {
+                      if (!confirm("确定要删除 " + prbitem.name + " 吗？")) return;
+                      var idx = indexOf(prbitem);
+                      if (idx === undefined) return;
+                      for (var row of tabledata) {
+                        if (row.is_first && (typeof row.gid === "number")) {
+                          row.scoring = [].concat(row.scoring.slice(0, idx), row.scoring.slice(idx + 1));
+                          row.dirty = true;
+                        }
+                      }
+                      that.problems = [].concat(that.problems.slice(0, idx), that.problems.slice(idx + 1));
+                      that.ps_dirty = true;
+                      that.mark_dirty();
+                    }
+                  },
+                  {
+                    title: "在前面插入",
+                    action: function () {
+                      var idx = indexOf(prbitem);
+                      if (idx === undefined) return;
+                      insertAt(idx);
+                    }
+                  },
+                  {
+                    title: "在后面插入",
+                    action: function () {
+                      var idx = indexOf(prbitem);
+                      if (idx === undefined) return;
+                      insertAt(idx + 1);
+                    }
+                  }
+                ]
               };
-            });
+              return prbitem;
+            }
+            return that.ps.problems.split(",").map(createProblemItem);
           })();
-          that.promlem_dirty = false;
+          that.ps_dirty = false;
           that.tabledata = (function () {
             var data = [];
             for (var scoring of that.scorings) {
@@ -700,6 +774,7 @@ var pspage = (function () {
           that.all_checked = false;
           that.vscroller.scrollTop(0);
           that.hscroller.scrollLeft(0);
+          that.mark_dirty(false);
         });
       },
       onAllChecked: function () {
@@ -741,6 +816,14 @@ var pspage = (function () {
           .done(function() {
             that.fetch_data();
           });
+        }
+      },
+      mark_dirty: function (dirty) {
+        if (dirty === undefined) dirty = true;
+        for (item of nav.navitems) {
+          if (item.ps_id === this.ps_id) {
+            item.dirty = dirty;
+          }
         }
       }
     }
