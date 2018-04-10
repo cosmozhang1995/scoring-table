@@ -77,24 +77,24 @@
           <div v-if="is_shown" class="fullfill page-container">
             <div class="table-container">
               <div class="tool-buttons">
-                <a href="javascript:;" class="button" @click="regroup()">设置分组</a>
-                <a href="javascript:;" class="button" @click="degroup()">解除分组</a>
+                <a href="javascript:;" class="button" @click="pagedata.regroup()">设置分组</a>
+                <a href="javascript:;" class="button" @click="pagedata.degroup()">解除分组</a>
               </div>
               <div class="head-row">
                 <table class="common-table">
                   <tr>
-                    <th class="c1"><input type="checkbox" v-model="all_checked" v-on:change="onAllChecked()"></th>
+                    <th class="c1"><input type="checkbox" v-model="pagedata.all_checked" v-on:change="pagedata.onAllChecked()"></th>
                     <th class="c2">分组</th>
                     <th class="c3">学号</th>
                     <th class="c4">姓名</th>
-                    <th class="cs" v-for="prb in problems" v-text="prb.name" v-on:contextmenu="support.ctxmenu(prb.menu, $event)"></th>
+                    <th class="cs" v-for="prb in pagedata.problems" v-text="prb.name" v-on:contextmenu="support.ctxmenu(prb.menu, $event)"></th>
                   </tr>
                 </table>
               </div>
               <div class="body-rows">
                 <div class="head-cols">
                   <table class="common-table">
-                    <tr v-for="rowdata in tabledata">
+                    <tr v-for="rowdata in pagedata.tabledata">
                       <td class="c1 align-center"><input type="checkbox" v-model="rowdata.checked"></td>
                       <td class="c2 align-center" v-if="rowdata.is_first" v-bind:rowspan="rowdata.numsts" v-text="rowdata.gsq"></td>
                       <td class="c3" v-text="rowdata.student.no"></td>
@@ -103,11 +103,11 @@
                   </table>
                 </div>
                 <div class="main-table">
-                  <table class="common-table">
-                    <tr v-for="rowdata in tabledata">
+                  <table class="common-table" v-bind:class="{ 'top-active': top_active, 'left-active': left_active }">
+                    <tr v-for="rowdata in pagedata.tabledata">
                       <td class="c0"></td>
                       <!-- 显示界面 -->
-                      <td class="cs" v-if="rowdata.is_first && !rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring" v-text="scr.str"></td>
+                      <td class="cs" v-if="rowdata.is_first && !rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring" v-text="scr.str" @click="onCellClick(scr, $event)" v-bind:class="{ active: scr.active }"></td>
                       <!-- 编辑界面 -->
                       <td class="cs" v-if="rowdata.is_first && rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring"><input v-model="scr.edit"></td>
                     </tr>

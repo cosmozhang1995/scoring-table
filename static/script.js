@@ -91,6 +91,31 @@ $(document).on("keydown", function(event) {
     event.preventDefault();
     $(document).trigger('save');
   }
+  if (event.keyCode == 37) {
+    event.preventDefault();
+    $(document).trigger('arrow-left');
+  }
+  if (event.keyCode == 38) {
+    event.preventDefault();
+    $(document).trigger('arrow-up');
+  }
+  if (event.keyCode == 39) {
+    event.preventDefault();
+    $(document).trigger('arrow-right');
+  }
+  if (event.keyCode == 40) {
+    event.preventDefault();
+    $(document).trigger('arrow-down');
+  }
+});
+
+$(document).on("click", ".common-table td, .common-table th", function(event) {
+  if (event.target === this) {
+    var checkboxEl = $(this).find("input[type='checkbox']");
+    if (checkboxEl) {
+      checkboxEl.click();
+    }
+  }
 });
 
 var support = (function() {
@@ -200,12 +225,19 @@ var nav = (function () {
               ps_id: ps.id,
               ps: ps,
               dirty: false,
+              pagedata: undefined,
               resolve: function () {
-                pspage.ps_id = item.ps_id;
-                pspage.fetch_data()
-                .then(function() {
+                if (!item.pagedata) {
+                  item.pagedata = new ProblemSetPageData(item.ps_id);
+                  item.pagedata.fetch_data()
+                  .then(function() {
+                    pspage.pagedata = item.pagedata;
+                    pspage.show();
+                  });
+                } else {
+                  pspage.pagedata = item.pagedata;
                   pspage.show();
-                });
+                }
               },
               exit: function () {
                 pspage.hide();
@@ -574,27 +606,267 @@ Vue.directive("scroller-visible", (function () {
   };
 })());
 
+function ProblemSetPageData (ps_id) {
+  this.ps_id = ps_id;
+  this.ps = {};
+  this.ps_edit = {
+    method: "",
+    problems: ""
+  };
+  this.scorings = [];
+  this.tabledata = [];
+  this.problems = [];
+  this.ps_dirty = false;
+  this.all_checked = false;
+  function number2str(num) {
+    if (typeof num === "number" && !isNaN(num)) return "" + num;
+    else return "";
+  }
+  this.fetch_problemset = function () {
+    var that = this;
+    return new Promise(function (resolve, reject) {
+      r_get('/api/problemset/' + that.ps_id)
+      .done(function(data) {
+        that.ps = data;
+        resolve();
+      })
+      .fail(function(err) {
+        reject();
+      })
+    });
+  },
+  this.fetch_scoring = function() {
+    var that = this;
+    return new Promise(function (resolve, reject) {
+      r_get('/api/scorings/' + that.ps_id)
+      .done(function(data) {
+        that.scorings = data;
+        resolve();
+      })
+      .fail(function(err) {
+        reject();
+      })
+    });
+  };
+  this.fetch_data = function() {
+    var that = this;
+    return Promise.all([that.fetch_problemset(), that.fetch_scoring()])
+    .then(function() {
+      that.problems = (function() {
+        function indexOf(prbitem) {
+          var idx = undefined;
+          for (var i in that.problems) {
+            if (that.problems[i] === prbitem) {
+              idx = i;
+              break;
+            }
+          }
+          return idx;
+        }
+        function insertAt(idx) {
+          var name = prompt("插入新问题");
+          if (typeof name !== "string" || name.length == 0) return;
+          var prbitem = createProblemItem(name);
+          for (var row of that.tabledata) {
+            if (row.is_first) {
+              row.scoring = [].concat(row.scoring.slice(0, idx), [create_scoring_item(NaN, row)], row.scoring.slice(idx));
+              if (typeof row.gid === "number") row.dirty = true;
+            }
+          }
+          that.problems = [].concat(that.problems.slice(0, idx), [prbitem], that.problems.slice(idx));
+          that.ps_dirty = true;
+          that.mark_dirty();
+        }
+        function createProblemItem (word) {
+          var name = word.trim();
+          var prbitem = {
+            name: word.trim(),
+            menu: [
+              {
+                title: "重命名",
+                action: function () {
+                  var oldname = prbitem.name;
+                  var newname = prompt("重命名", oldname);
+                  if (oldname != newname) {
+                    prbitem.name = newname;
+                    that.ps_dirty = true;
+                    that.mark_dirty();
+                  }
+                }
+              },
+              {
+                title: "删除",
+                action: function () {
+                  if (!confirm("确定要删除 " + prbitem.name + " 吗？")) return;
+                  var idx = indexOf(prbitem);
+                  if (idx === undefined) return;
+                  for (var row of that.tabledata) {
+                    if (row.is_first) {
+                      row.scoring = [].concat(row.scoring.slice(0, idx), row.scoring.slice(idx + 1));
+                      if (typeof row.gid === "number") row.dirty = true;
+                    }
+                  }
+                  that.problems = [].concat(that.problems.slice(0, idx), that.problems.slice(idx + 1));
+                  that.ps_dirty = true;
+                  that.mark_dirty();
+                }
+              },
+              {
+                title: "在前面插入",
+                action: function () {
+                  var idx = indexOf(prbitem);
+                  if (idx === undefined) return;
+                  insertAt(idx);
+                }
+              },
+              {
+                title: "在后面插入",
+                action: function () {
+                  var idx = indexOf(prbitem);
+                  if (idx === undefined) return;
+                  insertAt(idx + 1);
+                }
+              }
+            ]
+          };
+          return prbitem;
+        }
+        return that.ps.problems.split(",").map(createProblemItem);
+      })();
+      that.ps_dirty = false;
+      function create_scoring_item(scrnum, parent) {
+        return {
+          num: scrnum,
+          get str() { return number2str(this.num); },
+          editing: false,
+          m_active: false,
+          get active() { return this.m_active; },
+          set active(val) {
+            this.m_active = val;
+            this.editing = false;
+          },
+          parent: parent
+        };
+      }
+      that.tabledata = (function () {
+        var data = [];
+        for (var scoring of that.scorings) {
+          var gid = scoring.gid;
+          var sts = scoring.students;
+          var scr = (scoring.scoring||"").split(",").map((word) => parseInt(word));
+          while (scr.length < that.problems.length) scr.push(NaN);
+          var firstitem = {
+            is_first: true,
+            gsq: "-",
+            gid: gid,
+            student: sts[0],
+            numsts: sts.length,
+            scoring: null,
+            checked: false,
+            editing: false,
+            dirty: false
+          };
+          firstitem.scoring = scr.map((scrnum) => create_scoring_item(scrnum, firstitem));
+          data.push(firstitem);
+          for (var st of sts.slice(1)) {
+            data.push({
+              is_first: false,
+              gid: gid,
+              student: st,
+              checked: false
+            });
+          }
+        }
+        return data;
+      })();
+      that.all_checked = false;
+      var pspage = window.pspage;
+      if (pspage && pspage.pagedata === that) {
+        pspage.vscroller.scrollTop(0);
+        pspage.hscroller.scrollLeft(0);
+      }
+      that.mark_dirty(false);
+    });
+  };
+  this.onAllChecked = function () {
+    for (var rowdata of this.tabledata) {
+      rowdata.checked = this.all_checked;
+    }
+  };
+  this.regroup = function () {
+    var that = this;
+    var rows = this.tabledata.filter((row) => row.checked);
+    if (rows.length > 1) {
+      var sts = rows.map((row) => row.student);
+      if (!confirm("确定要将 " + sts.map((st) => st.name).join("、") + " 分为一组吗？")) return;
+      r_post("/api/regroup/" + that.ps_id, { "sids": sts.map((st) => st.id) })
+      .done(function() {
+        that.fetch_data();
+      });
+    }
+  },
+  this.degroup = function () {
+    var that = this;
+    var rows = this.tabledata.filter((row) => row.checked);
+    if (rows.length > 0) {
+      var gid = rows[0].gid;
+      var sts = rows.map((row) => row.student);
+      var stnamesstr = sts.map((st) => st.name).join("、");
+      for (row of rows) {
+        if (row.gid != gid) {
+          alert(stnamesstr + " 并不在同一分组中，请检查");
+          return;
+        }
+      }
+      if (!confirm("确定要解除 " + stnamesstr + " 的分组吗？")) return;
+      r_post("/api/degroup/" + gid)
+      .done(function() {
+        that.fetch_data();
+      });
+    }
+  },
+  this.mark_dirty = function (dirty) {
+    if (dirty === undefined) dirty = true;
+    for (item of nav.navitems) {
+      if (item.ps_id === this.ps_id) {
+        item.dirty = dirty;
+      }
+    }
+  }
+}
+
 var pspage = (function () {
+  var Direction = {
+    Up: 1,
+    Down: 2,
+    Left: 3,
+    Right: 4
+  };
   return new Vue({
     el: "#pspage",
     data: {
       is_shown: false,
-      ps_id: undefined,
-      ps: {},
-      ps_edit: {
-        method: "",
-        problems: ""
-      },
-      scorings: [],
-      tabledata: [],
-      problems: [],
-      ps_dirty: false,
-      all_checked: false,
+      pagedata: undefined,
       hscroller: new Scroller(Scroller.H),
       vscroller: new Scroller(Scroller.V),
-      support: support
+      support: support,
+      active_cell: undefined
     },
     computed: {
+      top_active: function () {
+        if (this.active_cell && this.pagedata && this.pagedata.tabledata[0] === this.active_cell.parent) {
+          return true;
+        } else {
+          return false;
+        }
+      },
+      left_active: function () {
+        if (this.active_cell && this.active_cell.parent.scoring[0] === this.active_cell) {
+          return true;
+        } else {
+          return false;
+        }
+      }
     },
     created: function () {
       var that = this;
@@ -615,6 +887,11 @@ var pspage = (function () {
         var sl = event.scrollLeft;
         $(that.$el).find('.main-table .common-table').css("position", "relative").css("left", -sl + "px");
       });
+      $(document).on('arrow-up', () => that.onArrow(Direction.Up));
+      $(document).on('arrow-down', () => that.onArrow(Direction.Down));
+      $(document).on('arrow-left', () => that.onArrow(Direction.Left));
+      $(document).on('arrow-right', () => that.onArrow(Direction.Right));
+      $(document).on('click', (e) => that.onGlobalClick(e));
     },
     methods: {
       show: function () {
@@ -622,209 +899,96 @@ var pspage = (function () {
       },
       hide: function () {
         this.is_shown = false;
-      },
-      fetch_problemset: function () {
-        var that = this;
-        return new Promise(function (resolve, reject) {
-          r_get('/api/problemset/' + that.ps_id)
-          .done(function(data) {
-            that.ps = data;
-            resolve();
-          })
-          .fail(function(err) {
-            reject();
-          })
-        });
-      },
-      fetch_scoring: function() {
-        var that = this;
-        return new Promise(function (resolve, reject) {
-          r_get('/api/scorings/' + that.ps_id)
-          .done(function(data) {
-            that.scorings = data;
-            resolve();
-          })
-          .fail(function(err) {
-            reject();
-          })
-        });
-      },
-      fetch_data: function() {
-        var that = this;
-        return Promise.all([that.fetch_problemset(), that.fetch_scoring()])
-        .then(function() {
-          that.problems = (function() {
-            function indexOf(prbitem) {
-              var idx = undefined;
-              for (var i in that.problems) {
-                if (that.problems[i] === prbitem) {
-                  idx = i;
-                  break;
-                }
-              }
-              return idx;
-            }
-            function insertAt(idx) {
-              var name = prompt("插入新问题");
-              if (typeof name !== "string" || name.length == 0) return;
-              var prbitem = createProblemItem(name);
-              for (var row of tabledata) {
-                if (row.is_first && (typeof row.gid === "number")) {
-                  row.scoring = [].concat(row.scoring.slice(0, idx), [NaN], row.scoring.slice(idx));
-                  row.dirty = true;
-                }
-              }
-              that.problems = [].concat(that.problems.slice(0, idx), [prbitem], that.problems.slice(idx));
-              that.ps_dirty = true;
-              that.mark_dirty();
-            }
-            function createProblemItem (word) {
-              var name = word.trim();
-              var prbitem = {
-                name: word.trim(),
-                menu: [
-                  {
-                    title: "重命名",
-                    action: function () {
-                      var oldname = prbitem.name;
-                      var newname = prompt("重命名", oldname);
-                      if (oldname != newname) {
-                        prbitem.name = newname;
-                        that.ps_dirty = true;
-                        that.mark_dirty();
-                      }
-                    }
-                  },
-                  {
-                    title: "删除",
-                    action: function () {
-                      if (!confirm("确定要删除 " + prbitem.name + " 吗？")) return;
-                      var idx = indexOf(prbitem);
-                      if (idx === undefined) return;
-                      for (var row of tabledata) {
-                        if (row.is_first && (typeof row.gid === "number")) {
-                          row.scoring = [].concat(row.scoring.slice(0, idx), row.scoring.slice(idx + 1));
-                          row.dirty = true;
-                        }
-                      }
-                      that.problems = [].concat(that.problems.slice(0, idx), that.problems.slice(idx + 1));
-                      that.ps_dirty = true;
-                      that.mark_dirty();
-                    }
-                  },
-                  {
-                    title: "在前面插入",
-                    action: function () {
-                      var idx = indexOf(prbitem);
-                      if (idx === undefined) return;
-                      insertAt(idx);
-                    }
-                  },
-                  {
-                    title: "在后面插入",
-                    action: function () {
-                      var idx = indexOf(prbitem);
-                      if (idx === undefined) return;
-                      insertAt(idx + 1);
-                    }
-                  }
-                ]
-              };
-              return prbitem;
-            }
-            return that.ps.problems.split(",").map(createProblemItem);
-          })();
-          that.ps_dirty = false;
-          that.tabledata = (function () {
-            var data = [];
-            for (var scoring of that.scorings) {
-              var gid = scoring.gid;
-              var sts = scoring.students;
-              var scr = (scoring.scoring||"").split(",").map((word) => parseInt(word));
-              while (scr.length < that.problems.length) scr.push(NaN);
-              data.push({
-                is_first: true,
-                gsq: "-",
-                gid: gid,
-                student: sts[0],
-                numsts: sts.length,
-                scoring: scr.map((scrnum) => {
-                  var numstr = that.number2str(scrnum);
-                  return {
-                    num: scrnum,
-                    str: that.number2str(scrnum),
-                    edit: that.number2str(scrnum)
-                  };
-                }),
-                checked: false,
-                editing: false,
-                dirty: false
-              });
-              for (var st of sts.slice(1)) {
-                data.push({
-                  is_first: false,
-                  gid: gid,
-                  student: st,
-                  checked: false
-                });
-              }
-            }
-            return data;
-          })();
-          that.all_checked = false;
-          that.vscroller.scrollTop(0);
-          that.hscroller.scrollLeft(0);
-          that.mark_dirty(false);
-        });
-      },
-      onAllChecked: function () {
-        for (var rowdata of this.tabledata) {
-          rowdata.checked = this.all_checked;
+        if (this.active_cell) {
+          this.active_cell.active = false;
+          this.active_cell = undefined;
         }
       },
-      number2str: function (num) {
-        if (typeof num === "number" && !isNaN(num)) return "" + num;
-        else return "";
-      },
-      regroup: function () {
+      onActiveCellChanged: function () {
         var that = this;
-        var rows = this.tabledata.filter((row) => row.checked);
-        if (rows.length > 1) {
-          var sts = rows.map((row) => row.student);
-          if (!confirm("确定要将 " + sts.map((st) => st.name).join("、") + " 分为一组吗？")) return;
-          r_post("/api/regroup/" + that.ps_id, { "sids": sts.map((st) => st.id) })
-          .done(function() {
-            that.fetch_data();
-          });
-        }
+        setTimeout(function() {
+          var activeCellEl = $(that.$el).find('.main-table .common-table td.active');
+          if (activeCellEl.length == 0) return;
+          var wrapperEl = activeCellEl.closest('.main-table');
+          var cellOffset = activeCellEl.offset();
+          var cellWidth = activeCellEl.outerWidth();
+          var cellHeight = activeCellEl.outerHeight();
+          var cellTop = cellOffset.top;
+          var cellLeft = cellOffset.left;
+          var cellRight = cellLeft + cellWidth;
+          var cellBottom = cellTop + cellHeight;
+          var wrapperOffset = wrapperEl.offset();
+          var wrapperWidth = wrapperEl.width();
+          var wrapperHeight = wrapperEl.height();
+          var wrapperTop = wrapperOffset.top;
+          var wrapperLeft = wrapperOffset.left;
+          var wrapperRight = wrapperLeft + wrapperWidth;
+          var wrapperBottom = wrapperTop + wrapperHeight;
+          var deltaScrollX = 0;
+          var deltaScrollY = 0;
+          if (cellLeft < wrapperLeft) deltaScrollX = cellLeft - wrapperLeft;
+          else if (cellRight > wrapperRight) deltaScrollX = cellRight - wrapperRight;
+          if (cellTop < wrapperTop) deltaScrollY = cellTop - wrapperTop;
+          else if (cellBottom > wrapperBottom) deltaScrollY = cellBottom - wrapperBottom;
+          if (deltaScrollX != 0) that.hscroller.scrollLeft(that.hscroller.scrollLeft() + deltaScrollX);
+          if (deltaScrollY != 0) that.vscroller.scrollTop(that.vscroller.scrollTop() + deltaScrollY);
+        }, 50);
       },
-      degroup: function () {
-        var that = this;
-        var rows = this.tabledata.filter((row) => row.checked);
-        if (rows.length > 0) {
-          var gid = rows[0].gid;
-          var sts = rows.map((row) => row.student);
-          var stnamesstr = sts.map((st) => st.name).join("、");
-          for (row of rows) {
-            if (row.gid != gid) {
-              alert(stnamesstr + " 并不在同一分组中，请检查");
-              return;
+      onArrow: function (direction) {
+        if (!this.active_cell) return;
+        var active_cell = this.active_cell;
+        var row = active_cell.parent;
+        var idx = (function () {
+          for (var i in row.scoring) {
+            if (row.scoring[i] === active_cell) return parseInt(i);
+          }
+          return undefined;
+        })();
+        if (idx === undefined) return;
+        var newitem = undefined;
+        if (direction == Direction.Up || direction == Direction.Down) {
+          var tabledata = this.pagedata.tabledata.filter((row) => row.is_first);
+          var ridx = (function () {
+            for (var i in tabledata) {
+              if (tabledata[i] === row) return parseInt(i);
+            }
+            return undefined;
+          })();
+          if (ridx !== undefined) {
+            if (direction == Direction.Up && ridx > 0) {
+              newitem = tabledata[ridx - 1].scoring[idx];
+            } else if (direction == Direction.Down && ridx < tabledata.length - 1) {
+              newitem = tabledata[ridx + 1].scoring[idx];
             }
           }
-          if (!confirm("确定要解除 " + stnamesstr + " 的分组吗？")) return;
-          r_post("/api/degroup/" + gid)
-          .done(function() {
-            that.fetch_data();
-          });
-        }
-      },
-      mark_dirty: function (dirty) {
-        if (dirty === undefined) dirty = true;
-        for (item of nav.navitems) {
-          if (item.ps_id === this.ps_id) {
-            item.dirty = dirty;
+        } else if (direction == Direction.Left || direction == Direction.Right) {
+          if (direction == Direction.Left && idx > 0) {
+            newitem = row.scoring[idx - 1];
+          } else if (direction == Direction.Right && idx < row.scoring.length - 1) {
+            newitem = row.scoring[idx + 1];
           }
         }
+        if (newitem !== undefined) {
+          active_cell.active = false;
+          this.active_cell = newitem;
+          this.active_cell.active = true;
+        }
+        this.onActiveCellChanged();
+      },
+      onGlobalClick: function (event) {
+        if (this.active_cell) {
+          this.active_cell.active = false;
+          this.active_cell = undefined;
+        }
+      },
+      onCellClick: function (cell, event) {
+        if (this.active_cell) {
+          this.active_cell.active = false;
+          this.active_cell = undefined;
+        }
+        this.active_cell = cell;
+        this.active_cell.active = true;
+        event.stopPropagation();
       }
     }
   });
