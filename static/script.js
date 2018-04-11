@@ -43,6 +43,14 @@ function r_delete(url) {
   });
 }
 
+function ajax2promise(ajaxRequest) {
+  return new Promise(function (resolve, reject) {
+    ajaxRequest
+    .done(resolve)
+    .fail(reject);
+  });
+}
+
 function parse_csv(textdata) {
   var data = [];
   for (var line of textdata.split('\n')) {
@@ -618,6 +626,30 @@ function ProblemSetPageData (ps_id) {
   this.problems = [];
   this.ps_dirty = false;
   this.all_checked = false;
+  this.dirty = false;
+  this._method = "";
+  var that = this;
+  Object.defineProperty(this, "method", {
+    get: function() {
+      return this._method;
+    },
+    set: function(val) {
+      this._method = val || "";
+      if (that.tabledata) {
+        that.tabledata.filter((row) => row.is_first).forEach(function(row) {
+          row.updateFinalScore();
+        });
+      }
+    }
+  });
+  this.method_menu = [
+    {
+      title: "修改",
+      action: function () {
+        that.modifyMethod();
+      }
+    }
+  ]
   function number2str(num) {
     if (typeof num === "number" && !isNaN(num)) return "" + num;
     else return "";
@@ -652,6 +684,7 @@ function ProblemSetPageData (ps_id) {
     var that = this;
     return Promise.all([that.fetch_problemset(), that.fetch_scoring()])
     .then(function() {
+      that.method = that.ps.method || "";
       that.problems = (function() {
         function indexOf(prbitem) {
           var idx = undefined;
@@ -736,7 +769,17 @@ function ProblemSetPageData (ps_id) {
       that.ps_dirty = false;
       function create_scoring_item(scrnum, parent) {
         return {
-          num: scrnum,
+          _num: scrnum,
+          get num() { return this._num; },
+          set num(val) {
+            if (val !== this._num) {
+              this._num = val;
+              if (this.parent) {
+                this.parent.dirty = true;
+                this.parent.updateFinalScore();
+              }
+            }
+          },
           get str() { return number2str(this.num); },
           editing: false,
           m_active: false,
@@ -764,9 +807,50 @@ function ProblemSetPageData (ps_id) {
             scoring: null,
             checked: false,
             editing: false,
+            finalScore: NaN,
+            get finalScoreStr() {
+              if (isNaN(this.finalScore)) {
+                return "";
+              } else {
+                var decdgts = 1;
+                var str = "" + Math.round(this.finalScore * Math.pow(10, decdgts));
+                str = str.slice(0, str.length - decdgts) + "." + str.slice(str.length - decdgts);
+                while (str[str.length - 1] == "0") str = str.slice(0, str.length - 1);
+                if (str[str.length - 1] == ".") str = str.slice(0, str.length - 1);
+                if (str[0] == ".") str = "0" + str;
+                if (str.length == 0) return "0";
+                return str;
+              }
+            },
+            updateFinalScore: function() {
+              var nums = this.scoring.map((item) => item.num);
+              var allNaN = true;
+              for (var n of nums) {
+                if (!isNaN(n)) {
+                  allNaN = false;
+                  break;
+                }
+              }
+              if (allNaN) {
+                this.finalScore = NaN;
+                return;
+              }
+              nums = nums.map((n) => (isNaN(n) ? 0 : n));
+              var method = that.method;
+              for (var i in that.problems) {
+                var prbname = that.problems[i].name;
+                method = method.replace(new RegExp(prbname, "g"), "" + nums[i]);
+              }
+              // try {
+                this.finalScore = parseFloat(eval(method));
+              // } catch (e) {
+              //   this.finalScore = NaN;
+              // }
+            },
             dirty: false
           };
           firstitem.scoring = scr.map((scrnum) => create_scoring_item(scrnum, firstitem));
+          firstitem.updateFinalScore();
           data.push(firstitem);
           for (var st of sts.slice(1)) {
             data.push({
@@ -794,6 +878,10 @@ function ProblemSetPageData (ps_id) {
     }
   };
   this.regroup = function () {
+    if (this.dirty) {
+      alert("有尚未保存的进度，请保存后重试。");
+      return;
+    }
     var that = this;
     var rows = this.tabledata.filter((row) => row.checked);
     if (rows.length > 1) {
@@ -804,8 +892,12 @@ function ProblemSetPageData (ps_id) {
         that.fetch_data();
       });
     }
-  },
+  };
   this.degroup = function () {
+    if (this.dirty) {
+      alert("有尚未保存的进度，请保存后重试。");
+      return;
+    }
     var that = this;
     var rows = this.tabledata.filter((row) => row.checked);
     if (rows.length > 0) {
@@ -824,7 +916,22 @@ function ProblemSetPageData (ps_id) {
         that.fetch_data();
       });
     }
-  },
+  };
+  this.reload = function () {
+    if (this.dirty) {
+      if (!confirm("有尚未保存的进度，确定要重新加载么？")) return;
+    }
+    this.fetch_data();
+  };
+  this.modifyMethod = function () {
+    var oldmethod = this.method;
+    var newmethod = prompt("修改总分", oldmethod);
+    if (newmethod != oldmethod && newmethod) {
+      this.method = newmethod;
+      this.ps_dirty = true;
+      this.mark_dirty();
+    }
+  }
   this.mark_dirty = function (dirty) {
     if (dirty === undefined) dirty = true;
     for (item of nav.navitems) {
@@ -832,7 +939,44 @@ function ProblemSetPageData (ps_id) {
         item.dirty = dirty;
       }
     }
-  }
+    this.dirty = dirty;
+  };
+  this.save = function () {
+    var requests = [];
+    var that = this;
+    if (that.ps_dirty) {
+      var request = ajax2promise(r_put("/api/problemset/" + that.ps_id, {
+        problems: that.problems.map((prbitem) => prbitem.name).join(","),
+        method: that.method
+      }))
+      .then(function () {
+        that.ps_dirty = false;
+      });
+      requests.push(request);
+    }
+    that.tabledata.filter((item) => item.is_first).forEach(function (row) {
+      for (var scritem of row.scoring) {
+        scritem.active = false;
+      }
+      if (row.dirty) {
+        var scoring = row.scoring.map((scr) => scr.str).join(",");
+        if (typeof row.gid === "number") var url = "/api/score/group/" + row.gid;
+        else var url = "/api/score/problemset/" + that.ps_id + "/student/" + row.student.id;
+        var request = ajax2promise(r_put(url, { scoring: scoring }))
+        .then(function (data) {
+          row.gid = data.gid;
+          row.dirty = false;
+        });
+        requests.push(request);
+      }
+    });
+    return Promise.all(requests)
+    .then(function () {
+      that.mark_dirty(false);
+    }, function () {
+      alert("保存失败");
+    });
+  };
 }
 
 var pspage = (function () {
@@ -886,12 +1030,19 @@ var pspage = (function () {
       that.hscroller.on('scroll', function (event) {
         var sl = event.scrollLeft;
         $(that.$el).find('.main-table .common-table').css("position", "relative").css("left", -sl + "px");
+        $(that.$el).find('.head-row-main-cols .common-table').css("position", "relative").css("left", -sl + "px");
       });
       $(document).on('arrow-up', () => that.onArrow(Direction.Up));
       $(document).on('arrow-down', () => that.onArrow(Direction.Down));
       $(document).on('arrow-left', () => that.onArrow(Direction.Left));
       $(document).on('arrow-right', () => that.onArrow(Direction.Right));
       $(document).on('click', (e) => that.onGlobalClick(e));
+      $(document).on('keydown', function (event) {
+        var key = event.key;
+        var keyCode = event.keyCode;
+        that.onKeyDown(key, keyCode);
+      });
+      $(document).on('save', () => that.save());
     },
     methods: {
       show: function () {
@@ -989,6 +1140,42 @@ var pspage = (function () {
         this.active_cell = cell;
         this.active_cell.active = true;
         event.stopPropagation();
+      },
+      onKeyDown: function (key, keyCode) {
+        if (!this.active_cell) return;
+        var keynum = parseInt(key);
+        var oldnum = this.active_cell.num;
+        if (!isNaN(keynum)) {
+          if (this.active_cell.editing) {
+            var num = this.active_cell.num;
+            if (isNaN(num)) num = 0;
+            this.active_cell.num = num * 10 + keynum;
+          } else {
+            this.active_cell.num = keynum;
+            this.active_cell.editing = true;
+          }
+        } else if (keyCode == 8) {
+          if (this.active_cell.editing) {
+            var str = this.active_cell.str;
+            this.active_cell.num = parseInt(str.slice(0, str.length - 1));
+          } else {
+            this.active_cell.num = NaN;
+            this.active_cell.editing = true;
+          }
+        }
+        if (this.active_cell.num !== oldnum && !(isNaN(this.active_cell.num) && isNaN(oldnum))) {
+          this.active_cell.parent.dirty = true;
+          this.pagedata.mark_dirty();
+        }
+      },
+      save: function () {
+        if (this.pagedata) {
+          if (this.active_cell) {
+            this.active_cell.active = false;
+            this.active_cell = undefined;
+          }
+          this.pagedata.save();
+        }
       }
     }
   });

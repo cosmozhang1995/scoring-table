@@ -170,13 +170,17 @@ def api_degroup(request, grp_id):
 def api_update_group_scoring(request, grp_id):
   grp_id = int(grp_id)
   grp = Group.objects.get(id=grp_id)
-  scr = ScoringRecord.objects.get(group=grp)
+  scr = ScoringRecord.objects.filter(group=grp)
+  scr = scr[0] if len(scr) > 0 else None
   if scr is None:
     scr = ScoringRecord.objects.create(group=grp)
   data = parse_request_data(request)
   scr.scores = data['scoring']
   scr.save()
-  return HttpResponse("ok")
+  return JsonResponse({
+    "gid": grp_id,
+    "scoring": scr.scores
+  })
 
 def api_update_student_scoring(request, st_id, ps_id):
   st_id = int(st_id)
@@ -191,9 +195,14 @@ def api_update_student_scoring(request, st_id, ps_id):
     stgrp = StudentGroup.objects.create(group=grp, student=st)
   else:
     grp = stgrp.group
-  scr = ScoringRecord.objects.get(group=grp)
+  scr = ScoringRecord.objects.filter(group=grp)
+  scr = scr[0] if len(scr) > 0 else None
   if scr is None:
     scr = ScoringRecord.objects.create(group=grp)
   data = parse_request_data(request)
   scr.scores = data['scoring']
   scr.save()
+  return JsonResponse({
+    "gid": grp.id,
+    "scoring": scr.scores
+  })

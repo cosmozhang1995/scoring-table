@@ -79,17 +79,28 @@
               <div class="tool-buttons">
                 <a href="javascript:;" class="button" @click="pagedata.regroup()">设置分组</a>
                 <a href="javascript:;" class="button" @click="pagedata.degroup()">解除分组</a>
+                <a href="javascript:;" class="button" @click="pagedata.reload()">重新加载</a>
+                <a href="javascript:;" class="button" @click="save()">保存</a>
               </div>
               <div class="head-row">
-                <table class="common-table">
-                  <tr>
-                    <th class="c1"><input type="checkbox" v-model="pagedata.all_checked" v-on:change="pagedata.onAllChecked()"></th>
-                    <th class="c2">分组</th>
-                    <th class="c3">学号</th>
-                    <th class="c4">姓名</th>
-                    <th class="cs" v-for="prb in pagedata.problems" v-text="prb.name" v-on:contextmenu="support.ctxmenu(prb.menu, $event)"></th>
-                  </tr>
-                </table>
+                <div class="head-row-head-cols">
+                  <table class="common-table">
+                    <tr>
+                      <th class="c1"><input type="checkbox" v-model="pagedata.all_checked" v-on:change="pagedata.onAllChecked()"></th>
+                      <th class="c2">分组</th>
+                      <th class="c3">学号</th>
+                      <th class="c4">姓名</th>
+                    </tr>
+                  </table>
+                </div>
+                <div class="head-row-main-cols">
+                  <table class="common-table">
+                    <tr>
+                      <th class="cs" v-for="prb in pagedata.problems" v-text="prb.name" v-on:contextmenu="support.ctxmenu(prb.menu, $event)"></th>
+                      <th class="cs" v-on:contextmenu="support.ctxmenu(pagedata.method_menu, $event)">总分</th>
+                    </tr>
+                  </table>
+                </div>
               </div>
               <div class="body-rows">
                 <div class="head-cols">
@@ -106,10 +117,8 @@
                   <table class="common-table" v-bind:class="{ 'top-active': top_active, 'left-active': left_active }">
                     <tr v-for="rowdata in pagedata.tabledata">
                       <td class="c0"></td>
-                      <!-- 显示界面 -->
-                      <td class="cs" v-if="rowdata.is_first && !rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring" v-text="scr.str" @click="onCellClick(scr, $event)" v-bind:class="{ active: scr.active }"></td>
-                      <!-- 编辑界面 -->
-                      <td class="cs" v-if="rowdata.is_first && rowdata.editing" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring"><input v-model="scr.edit"></td>
+                      <td class="cs align-right" v-if="rowdata.is_first" v-bind:rowspan="rowdata.numsts" v-for="scr in rowdata.scoring" v-text="scr.str" @click="onCellClick(scr, $event)" v-bind:class="{ active: scr.active }"></td>
+                      <td class="cs align-right" v-if="rowdata.is_first" v-bind:rowspan="rowdata.numsts" v-text="rowdata.finalScoreStr"></td>
                     </tr>
                   </table>
                 </div>
