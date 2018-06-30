@@ -995,7 +995,7 @@ function ProblemSetPageData (ps_id) {
       outtable.push(outrow);
     }
     var outtext = outtable.map(function (outrow) {
-      return outrow.join(",");
+      return outrow.join("\t");
     }).join("\n");
     console.log(outtext);
   };
