@@ -1,4 +1,6 @@
-Vue.config.delimiters = ["[[", "]]"]
+Vue.config.delimiters = ["[[", "]]"];
+
+var backend = "";
 
 function resolvePage(pageurl) {
   pageurl = pageurl.split("/");
@@ -198,7 +200,7 @@ var nav = (function () {
   var navitem_add_ps = { page: "addps", title: "添加+", active: false, resolve: function () {
     var name = prompt();
     var that = this;
-    r_post('/api/problemset', { name: name })
+    r_post(backend + '/api/problemset', { name: name })
     .done(function(ps) {
       that.problemsets.push(ps);
       that.build_navitems();
@@ -255,7 +257,7 @@ var nav = (function () {
                   title: "重命名",
                   action: function() {
                     var val = prompt();
-                    r_put('/api/problemset/' + item.ps_id, {
+                    r_put(backend + '/api/problemset/' + item.ps_id, {
                       name: val
                     })
                     .done(function() {
@@ -268,7 +270,7 @@ var nav = (function () {
                   title: "删除",
                   action: function() {
                     if (confirm("确定要删除" + item.title + "吗？")) {
-                      r_delete('/api/problemset/' + item.ps_id)
+                      r_delete(backend + '/api/problemset/' + item.ps_id)
                       .done(function () {
                         that.problemsets = that.problemsets.filter((i) => i.id != item.ps_id);
                         that.build_navitems();
@@ -286,7 +288,7 @@ var nav = (function () {
       },
       fetch_problemsets: function () {
         var that = this;
-        r_get('/api/problemsets')
+        r_get(backend + '/api/problemsets')
         .done(function(data) {
           that.problemsets = data;
           that.build_navitems();
@@ -346,7 +348,7 @@ var homepage = (function () {
         var that = this;
         that.students = [];
         that.all_checked = false;
-        r_get("/api/students")
+        r_get(backend + "/api/students")
         .done(function(data) {
           that.students = data.map(create_student_table_item);
         });
@@ -360,7 +362,7 @@ var homepage = (function () {
         st.editing = false;
       },
       editStudentComplete: function (st) {
-        r_put("/api/student/" + st.id, {
+        r_put(backend + "/api/student/" + st.id, {
           no: st.edit.no,
           name: st.edit.name
         })
@@ -376,7 +378,7 @@ var homepage = (function () {
       deleteStudent: function (st) {
         var that = this;
         if (!confirm("确定要删除学生 " + st.name + " 吗？")) return;
-        r_delete("/api/student/" + st.id)
+        r_delete(backend + "/api/student/" + st.id)
         .done(function() {
           that.students = that.students.filter((item) => item.id != st.id);
         })
@@ -394,7 +396,7 @@ var homepage = (function () {
       },
       addStudentComplete: function () {
         var that = this;
-        r_post("/api/student", {
+        r_post(backend + "/api/student", {
           no: that.st_new.no,
           name: that.st_new.name
         })
@@ -416,7 +418,7 @@ var homepage = (function () {
           var failed = 0;
           var uploaded = [];
           for (item of data) {
-            r_post("/api/student", {
+            r_post(backend + "/api/student", {
               no: item[0],
               name: item[1]
             })
@@ -446,7 +448,7 @@ var homepage = (function () {
         var failed = 0;
         var deleted = 0;
         for (var st of students) {
-          r_delete("/api/student/" + st.id)
+          r_delete(backend + "/api/student/" + st.id)
           .done(function() {
             deleted += 1;
             if (deleted + failed == total) {
@@ -657,7 +659,7 @@ function ProblemSetPageData (ps_id) {
   this.fetch_problemset = function () {
     var that = this;
     return new Promise(function (resolve, reject) {
-      r_get('/api/problemset/' + that.ps_id)
+      r_get(backend + '/api/problemset/' + that.ps_id)
       .done(function(data) {
         that.ps = data;
         resolve();
@@ -670,7 +672,7 @@ function ProblemSetPageData (ps_id) {
   this.fetch_scoring = function() {
     var that = this;
     return new Promise(function (resolve, reject) {
-      r_get('/api/scorings/' + that.ps_id)
+      r_get(backend + '/api/scorings/' + that.ps_id)
       .done(function(data) {
         that.scorings = data;
         resolve();
@@ -887,7 +889,7 @@ function ProblemSetPageData (ps_id) {
     if (rows.length > 1) {
       var sts = rows.map((row) => row.student);
       if (!confirm("确定要将 " + sts.map((st) => st.name).join("、") + " 分为一组吗？")) return;
-      r_post("/api/regroup/" + that.ps_id, { "sids": sts.map((st) => st.id) })
+      r_post(backend + "/api/regroup/" + that.ps_id, { "sids": sts.map((st) => st.id) })
       .done(function() {
         that.fetch_data();
       });
@@ -911,7 +913,7 @@ function ProblemSetPageData (ps_id) {
         }
       }
       if (!confirm("确定要解除 " + stnamesstr + " 的分组吗？")) return;
-      r_post("/api/degroup/" + gid)
+      r_post(backend + "/api/degroup/" + gid)
       .done(function() {
         that.fetch_data();
       });
@@ -945,7 +947,7 @@ function ProblemSetPageData (ps_id) {
     var requests = [];
     var that = this;
     if (that.ps_dirty) {
-      var request = ajax2promise(r_put("/api/problemset/" + that.ps_id, {
+      var request = ajax2promise(r_put(backend + "/api/problemset/" + that.ps_id, {
         problems: that.problems.map((prbitem) => prbitem.name).join(","),
         method: that.method
       }))
@@ -960,8 +962,8 @@ function ProblemSetPageData (ps_id) {
       }
       if (row.dirty) {
         var scoring = row.scoring.map((scr) => scr.str).join(",");
-        if (typeof row.gid === "number") var url = "/api/score/group/" + row.gid;
-        else var url = "/api/score/problemset/" + that.ps_id + "/student/" + row.student.id;
+        if (typeof row.gid === "number") var url = backend + "/api/score/group/" + row.gid;
+        else var url = backend + "/api/score/problemset/" + that.ps_id + "/student/" + row.student.id;
         var request = ajax2promise(r_put(url, { scoring: scoring }))
         .then(function (data) {
           row.gid = data.gid;
@@ -976,6 +978,26 @@ function ProblemSetPageData (ps_id) {
     }, function () {
       alert("保存失败");
     });
+  };
+  this.export = function () {
+    var that = this;
+    var tabledata = this.tabledata;
+    var problems = this.problems;
+    var outtable = [["No", "Name"].concat(problems.map(function (item) { return item.name; }), ["Final"])];
+    var current_scores = [];
+    for (var rowdata of tabledata) {
+      if (rowdata.is_first) {
+        current_scores = rowdata.scoring.map(function (scr) { return scr.str; });
+        current_scores.push(rowdata.finalScoreStr);
+      }
+      var student = rowdata.student;
+      var outrow = ["" + student.no, "" + student.name].concat(current_scores);
+      outtable.push(outrow);
+    }
+    var outtext = outtable.map(function (outrow) {
+      return outrow.join(",");
+    }).join("\n");
+    console.log(outtext);
   };
 }
 
